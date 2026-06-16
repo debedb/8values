@@ -5,13 +5,6 @@
 <link rel="icon" type="x-icon" href="icon.png">
 <link rel="shortcut icon" type="x-icon" href="icon.png">
 <meta charset="utf-8">
-<script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({
-    google_ad_client: "ca-pub-6511426299019766",
-    enable_page_level_ads: true
-  });
-</script>
 </head>
 <body>
 <script type="application/javascript"
@@ -29,23 +22,6 @@
 <button class="small_button" onclick="prev_question()" id="back_button">Back</button>
 <button class="small_button_off" id="back_button_off">Back</button><br>
 
-<!-- Website visit statistics - no personal information is collected! -->
-<script type="text/javascript">
-var sc_project=11325211;
-var sc_invisible=1;
-var sc_security="fd9f0659";
-var scJsHost = (("https:" == document.location.protocol) ?
-"https://secure." : "http://www.");
-document.write("<sc"+"ript type='text/javascript' src='" +
-scJsHost+
-"statcounter.com/counter/counter.js'></"+"script>");
-</script>
-<noscript><div class="statcounter"><a title="web stats"
-href="http://statcounter.com/" target="_blank"><img
-class="statcounter"
-src="//c.statcounter.com/11325211/0/fd9f0659/1/" alt="web
-stats"></a></div></noscript>
-
 <!-- JavaScript for the test itself -->
 <script>
     var max_econ, max_dipl, max_govt, max_scty; // Max possible scores
@@ -54,7 +30,27 @@ stats"></a></div></noscript>
     let dipl_array = new Array(questions.length);
     let govt_array = new Array(questions.length);
     let scty_array = new Array(questions.length);
+    let answer_array = new Array(questions.length); // Raw multipliers, for share/compare
     var qn = 0; // Question number
+
+    // A challenger's encoded answers, passed via ?c=. Held but NOT revealed (blind quiz).
+    function getQueryVariable(variable) {
+        var query = window.location.search.substring(1)
+        var vars = query.split("&")
+        for (var i = 0; i < vars.length; i++) {
+            var pair = vars[i].split("=")
+            if (pair[0] == variable) { return decodeURIComponent(pair[1]) }
+        }
+        return ""
+    }
+    var challenge = getQueryVariable("c")
+
+    // Map an answer multiplier to a single digit and back. {1,.5,0,-.5,-1} -> {4,3,2,1,0}.
+    function encodeAnswers(arr) {
+        let retval = arr.map(function(m) { return String(Math.round(m * 2) + 2) }).join("")
+        return retval
+    }
+
     init_question();
     for (var i = 0; i < questions.length; i++) {
         max_econ += Math.abs(questions[i].effect.econ)
@@ -76,6 +72,7 @@ stats"></a></div></noscript>
     }
 
     function next_question(mult) {
+        answer_array[qn] = mult
         econ_array[qn] = mult*questions[qn].effect.econ
         dipl_array[qn] = mult*questions[qn].effect.dipl
         govt_array[qn] = mult*questions[qn].effect.govt
@@ -105,11 +102,16 @@ stats"></a></div></noscript>
         let final_dipl = dipl_array.reduce((a, b) => a + b, 0)
         let final_govt = govt_array.reduce((a, b) => a + b, 0)
         let final_scty = scty_array.reduce((a, b) => a + b, 0)
-        location.href = `results.html`
+        let url = `results.html`
             + `?e=${calc_score(final_econ,max_econ)}`
             + `&d=${calc_score(final_dipl,max_dipl)}`
             + `&g=${calc_score(final_govt,max_govt)}`
             + `&s=${calc_score(final_scty,max_scty)}`
+            + `&a=${encodeAnswers(answer_array)}`
+        if (challenge) {
+            url += `&c=${encodeURIComponent(challenge)}`
+        }
+        location.href = url
     }
 </script>
 </body>

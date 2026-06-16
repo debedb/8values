@@ -8,9 +8,74 @@
 <script>
   version = "Test Edition #1" //Remember to update this before making changes to the test itself!
 </script>
+<style>
+  #compare-card {
+    max-width: 700px;
+    margin: 16pt auto;
+    padding: 16pt 20pt;
+    border-radius: 10pt;
+    background: #f4f6f8;
+    border: 1px solid #d8dde2;
+    font-family: 'Montserrat', sans-serif;
+    color: #222;
+  }
+  #agree-headline { font-size: 22pt; font-weight: 700; }
+  #agree-sub { font-size: 13pt; color: #555; margin-bottom: 12pt; }
+  .cmp-row { margin: 10pt 0; }
+  .cmp-axis-label { font-size: 11pt; font-weight: 700; display: flex; justify-content: space-between; }
+  .cmp-axis-label .pole { color: #888; font-weight: 400; }
+  .cmp-track {
+    position: relative;
+    height: 16px;
+    margin-top: 4px;
+    border-radius: 8px;
+    background: linear-gradient(to right, #e3e7eb, #e3e7eb);
+  }
+  .cmp-dot {
+    position: absolute;
+    top: -3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    transform: translateX(-11px);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    font-size: 9pt;
+    line-height: 18px;
+    text-align: center;
+    color: #fff;
+    font-weight: 700;
+  }
+  .cmp-you  { background: #2196f3; }
+  .cmp-them { background: #e91e63; }
+  .cmp-row.diverge .cmp-track { box-shadow: 0 0 0 2px #e91e63; }
+  #diverge-hook {
+    margin-top: 14pt;
+    padding: 10pt 12pt;
+    background: #fff;
+    border-left: 4px solid #e91e63;
+    font-size: 12pt;
+  }
+  #challenge-block { max-width: 700px; margin: 16pt auto; text-align: center; }
+  #challenge-link {
+    width: 90%;
+    max-width: 640px;
+    padding: 8pt;
+    font-size: 11pt;
+    margin-top: 8pt;
+    border: 1px solid #bbb;
+    border-radius: 6pt;
+  }
+  .cmp-legend { font-size: 10pt; color: #666; margin-bottom: 8pt; }
+  .cmp-legend b.you  { color: #2196f3; }
+  .cmp-legend b.them { color: #e91e63; }
+</style>
 </head>
 <script type="application/javascript"
         src="ideologies.js">
+</script>
+<script type="application/javascript"
+        src="questions.js">
 </script>
 
 <body>
@@ -18,6 +83,14 @@
 <hr>
 
 <h1>Results</h1>
+
+<div id="compare-card">
+    <div id="agree-headline"></div>
+    <div id="agree-sub"></div>
+    <div class="cmp-legend"><b class="you">&#9679; You</b> &nbsp; vs &nbsp; <b class="them">&#9679; Them</b></div>
+    <div id="compare-tracks"></div>
+    <div id="diverge-hook"></div>
+</div>
 
 <h2>Economic Axis: <span class="weight-300" id="economic-label"></span></h2>
 <div class="axis">
@@ -50,25 +123,14 @@
 <h2>Closest Match: <span class="weight-300" id="ideology-label"></span></h2>
 <p>Ideological matching is a work in progress, and is much less accurate than the values and axes.</p>
 <p>You can send these results by copying and pasting the URL at the top of the page or using the image below. Think your matched ideology was wrong? Want to help us calibrate the test? Send the results along with your political ideology to us at eightvalues@gmail.com, or send us any comments, questions, or criticism. </p>
+<div id="challenge-block">
+    <button class="button" id="challenge-btn">Challenge a friend &mdash; copy link</button>
+    <p id="challenge-help" style="font-size:11pt;color:#555;">They take the quiz blind, then see how your answers compare.</p>
+    <input id="challenge-link" readonly style="display:none;">
+</div>
 <hr/>
 <img src="" id="banner">
 <button class="button" onclick="location.href='index.html';">Back</button> <br>
-<!-- Website visit statistics - no personal information is collected! -->
-<script type="text/javascript">
-var sc_project=11325211;
-var sc_invisible=1;
-var sc_security="fd9f0659";
-var scJsHost = (("https:" == document.location.protocol) ?
-"https://secure." : "http://www.");
-document.write("<sc"+"ript type='text/javascript' src='" +
-scJsHost+
-"statcounter.com/counter/counter.js'></"+"script>");
-</script>
-<noscript><div class="statcounter"><a title="web stats"
-href="http://statcounter.com/" target="_blank"><img
-class="statcounter"
-src="//c.statcounter.com/11325211/0/fd9f0659/1/" alt="web
-stats"></a></div></noscript>
 <script>
     function getQueryVariable(variable)
     {
@@ -145,6 +207,155 @@ stats"></a></div></noscript>
         }
     }
     document.getElementById("ideology-label").innerHTML = ideology
+
+    // ---- Blind-compare layer ----------------------------------------------
+    // Reads self answers (a) and challenger answers (c) from the URL.
+    // a is always present after taking the quiz; c is present only when this
+    // viewer was challenged via a quiz.html?c=... link.
+    function getParam(name) {
+        var query = window.location.search.substring(1)
+        var vars = query.split("&")
+        for (var i = 0; i < vars.length; i++) {
+            var pair = vars[i].split("=")
+            if (pair[0] == name) { return decodeURIComponent(pair[1]) }
+        }
+        return ""
+    }
+
+    // Digit -> multiplier: '4'..'0' -> 1, .5, 0, -.5, -1.
+    function decodeAnswers(str) {
+        let retval = []
+        for (var i = 0; i < str.length; i++) {
+            retval.push((Number(str[i]) - 2) / 2)
+        }
+        return retval
+    }
+
+    // Recompute the four axis scores from a decoded answer array, using the
+    // same effects and formula as the quiz (single source of truth).
+    function scoreFromAnswers(ans) {
+        let me = 0, md = 0, mg = 0, ms = 0
+        let fe = 0, fd = 0, fg = 0, fs = 0
+        for (var i = 0; i < questions.length; i++) {
+            me += Math.abs(questions[i].effect.econ)
+            md += Math.abs(questions[i].effect.dipl)
+            mg += Math.abs(questions[i].effect.govt)
+            ms += Math.abs(questions[i].effect.scty)
+            let m = ans[i] || 0
+            fe += m * questions[i].effect.econ
+            fd += m * questions[i].effect.dipl
+            fg += m * questions[i].effect.govt
+            fs += m * questions[i].effect.scty
+        }
+        let retval = {
+            econ: Number(calc_score_n(fe, me)),
+            dipl: Number(calc_score_n(fd, md)),
+            civil: Number(calc_score_n(fg, mg)),
+            scty: Number(calc_score_n(fs, ms))
+        }
+        return retval
+    }
+    function calc_score_n(score, max) {
+        return (100 * (max + score) / (2 * max)).toFixed(1)
+    }
+
+    var selfAns = getParam("a")
+    var challAns = getParam("c")
+
+    // "Challenge a friend": build a quiz link carrying THIS viewer's answers.
+    if (selfAns) {
+        var challengeUrl = new URL("quiz.html?c=" + encodeURIComponent(selfAns), window.location.href).href
+        var btn = document.getElementById("challenge-btn")
+        var linkInput = document.getElementById("challenge-link")
+        linkInput.value = challengeUrl
+        btn.onclick = function() {
+            linkInput.style.display = "inline-block"
+            linkInput.focus()
+            linkInput.select()
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(challengeUrl).then(function() {
+                    btn.innerHTML = "Link copied!"
+                }, function() {
+                    btn.innerHTML = "Select &amp; copy the link below"
+                })
+            } else {
+                document.execCommand("copy")
+                btn.innerHTML = "Link copied!"
+            }
+        }
+    } else {
+        document.getElementById("challenge-block").style.display = "none"
+    }
+
+    // If challenged, render the comparison.
+    if (challAns) {
+        var them = scoreFromAnswers(decodeAnswers(challAns))
+        var you = {
+            econ: Number(equality),
+            dipl: Number(peace),
+            civil: Number(liberty),
+            scty: Number(progress)
+        }
+        var axes = [
+            { key: "econ",  name: "Economic",   left: "Markets",   right: "Equality" },
+            { key: "dipl",  name: "Diplomatic", left: "Nation",    right: "Globe" },
+            { key: "civil", name: "Civil",      left: "Authority", right: "Liberty" },
+            { key: "scty",  name: "Societal",   left: "Tradition", right: "Progress" }
+        ]
+        // Note: track is 0..100 left->right. The stored axis value is the
+        // high-pole percentage, so 100 sits at the "right" pole label.
+        var totalGap = 0, maxGap = -1, maxAxis = axes[0]
+        for (var i = 0; i < axes.length; i++) {
+            var g = Math.abs(you[axes[i].key] - them[axes[i].key])
+            axes[i].gap = g
+            totalGap += g
+            if (g > maxGap) { maxGap = g; maxAxis = axes[i] }
+        }
+        var agreement = Math.round(100 - totalGap / axes.length)
+
+        var headline, frame
+        if (agreement >= 70) {
+            headline = "More alike than you might think."
+            frame = "You land close together across the board."
+        } else if (agreement >= 45) {
+            headline = "Plenty of common ground."
+            frame = "Real overlap, with a few axes worth talking through."
+        } else {
+            headline = "Genuine differences here."
+            frame = "Worth comparing how you each read the questions."
+        }
+        document.getElementById("agree-headline").innerHTML = "Agreement: " + agreement + "%"
+        document.getElementById("agree-sub").innerHTML = headline + " " + frame
+
+        var tracksHtml = ""
+        for (var i = 0; i < axes.length; i++) {
+            var ax = axes[i]
+            var youPct = you[ax.key], themPct = them[ax.key]
+            var diverge = (ax.key === maxAxis.key) ? " diverge" : ""
+            tracksHtml +=
+                '<div class="cmp-row' + diverge + '">' +
+                  '<div class="cmp-axis-label"><span class="pole">' + ax.left + '</span>' +
+                    '<span>' + ax.name + '</span>' +
+                    '<span class="pole">' + ax.right + '</span></div>' +
+                  '<div class="cmp-track">' +
+                    '<div class="cmp-dot cmp-you" style="left:' + youPct + '%">' + Math.round(youPct) + '</div>' +
+                    '<div class="cmp-dot cmp-them" style="left:' + themPct + '%">' + Math.round(themPct) + '</div>' +
+                  '</div>' +
+                '</div>'
+        }
+        document.getElementById("compare-tracks").innerHTML = tracksHtml
+
+        document.getElementById("diverge-hook").innerHTML =
+            "Biggest gap: <b>" + maxAxis.name + "</b> (you " + Math.round(you[maxAxis.key]) +
+            ", them " + Math.round(them[maxAxis.key]) + "). " +
+            "Is that a real disagreement, or did you read those questions differently? " +
+            "That gap is the place to start the conversation."
+
+        document.getElementById("compare-card").style.display = "block"
+    } else {
+        document.getElementById("compare-card").style.display = "none"
+    }
+    // -----------------------------------------------------------------------
 
     function createImage(src, x, y, w, h) {
         img = new Image ()
