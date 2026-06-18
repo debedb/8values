@@ -18,7 +18,7 @@
     border-radius: 6pt;
   }
   #mode-toggle label { margin: 0 8pt; cursor: pointer; }
-  #mode-toggle .note { font-size: 9pt; color: #999; margin-top: 4pt; }
+  #mode-toggle .note { font-size: 11pt; color: #777; margin-bottom: 6pt; font-weight: 700; }
   #annotate-banner {
     max-width: 700px;
     margin: 12pt auto;
@@ -38,12 +38,13 @@
 <script type="application/javascript" src="compare.js"></script>
 <h1>8values</h1>
 <hr>
-<!-- TEMPORARY testing toggle: pick full quiz vs a quick 5-question sample.
-     Shown only on a fresh (round 0) take; later takers inherit the set. -->
+<!-- Start-of-quiz length choice: full quiz vs a quick 5-question sample.
+     Shown only on a fresh (round 0) take; later takers inherit the set so both
+     people answer the same questions. -->
 <div id="mode-toggle" style="display:none;">
+  <div class="note">How long do you want this to be?</div>
   <label><input type="radio" name="qmode" value="sample" checked> Quick sample (5 random)</label>
   <label><input type="radio" name="qmode" value="full"> Full quiz (70)</label>
-  <div class="note">Temporary testing toggle</div>
 </div>
 <div id="annotate-banner" style="display:none;">
   <b>They read this one differently.</b> Re-answer just the questions they flagged.
@@ -76,9 +77,9 @@
     var isRound0 = thread.length === 0
 
     // ---- Question set ---------------------------------------------------------
-    // TEMPORARY testing aid: a round-0 taker can answer a random 5 instead of all
-    // 70. The chosen set is stored on round 0 of the thread so every later taker
-    // answers the same questions (otherwise the comparison is meaningless).
+    // A round-0 taker chooses full quiz or a random 5-question sample. The chosen
+    // set is stored on round 0 of the thread so every later taker answers the
+    // same questions (otherwise the comparison is meaningless).
     function inheritedSample() {
         var retval = null
         if (thread.length > 0 && thread[0].q) { retval = thread[0].q }

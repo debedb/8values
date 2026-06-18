@@ -57,9 +57,9 @@ product). Both verified in a real browser. Deploy target chosen: GitHub Pages on
 - `quiz.html` — three modes off `?t=`: solo round 0 (all 70), blind round 1
   (all 70, hidden), **annotate** (only the other person's flagged questions, note
   shown, seeded from this taker's prior answers). Appends its round, hands to
-  results. Also a **TEMPORARY** round-0 toggle: full quiz vs a random 5-question
-  sample (default sample, for testing); the chosen set is stored on round 0
-  (`.q`) so every later taker answers the same questions. Removed ad/statcounter.
+  results. Also a round-0 length choice: full quiz vs a random 5-question sample;
+  the chosen set is stored on round 0 (`.q`) so every later taker answers the same
+  questions. Removed ad/statcounter.
 - `results.html` — thread-driven: recompute bars/labels/ideology/banner from the
   viewer's answers; compare card vs the other participant; **flag composer**
   (question picker + 200-char note), **flag transcript**, and the send-back /
