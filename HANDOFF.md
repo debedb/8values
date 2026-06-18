@@ -11,38 +11,63 @@ politicalcompass.org is closed (copyright bars adaptation) — not used.
 
 ## State at this checkpoint
 
-Branch `feat/blind-compare` (off `master`). Not pushed. Not deployed.
+Branch `feat/blind-compare` (off `master`).
 
-Working POC: the **share + blind-compare substrate**. Annotation layer (the real
-product) is NOT built yet — see Next steps.
+Working: **share + blind-compare substrate AND the annotation layer** (the real
+product). Both verified in a real browser. Deploy target chosen: GitHub Pages on
+`debedb/8values` master.
 
 ### Flow that works now
-1. Alice takes the quiz → results page → "Challenge a friend — copy link"
-   button. Link is `quiz.html?c=<Alice's encoded answers>`.
-2. Bob opens the link → takes the quiz **blind** (Alice's answers are held in a
-   var, never shown — anti-anchoring).
-3. Bob's results page shows a **compare card**: Agreement %, a you-vs-them dot
-   track per axis, and the biggest-gap axis highlighted with a "real disagreement
-   or different reading?" hook.
+1. Alice takes the quiz → results → "Challenge a friend — copy link"
+   (`quiz.html?t=<thread>`).
+2. Bob opens the link → takes the quiz **blind** (Alice's answers are held in the
+   thread, never shown — anti-anchoring).
+3. Bob's results show the **compare card**: Agreement %, a you-vs-them dot track
+   per axis, biggest-gap axis highlighted.
+4. **Annotation:** on the compare view either person can **flag** a question they
+   read differently and add a ~200-char note. "Send back — copy link" hands the
+   conversation to the other person, who re-answers **only the flagged questions**
+   (their note shown, anti-anchoring kept), then compares again. Unbounded rounds
+   — the conversation can run many turns back and forth.
 
-### Architecture (deliberate)
+## Architecture (deliberate)
 - **No backend, no accounts, no cost.** All state rides in the URL. Conversation
-  passes hand-to-hand like letters; each share is a new URL.
+  passes hand-to-hand like letters; each send is a new URL.
+- One **thread** carries everything, in `?t=`. A thread is an ordered list of
+  rounds (`compare.js`):
+  `round = { p: 0|1, a: "<70-digit answers>", f: [ { q: <index>, n: "<note>" } ] }`
+  `p` participant (0 initiator / 1 challenger), `a` that person's full answers,
+  `f` flags they raised that round. Round N re-answers round N-1's flags and may
+  raise new ones. The viewer on `results.html` is the author of the latest round;
+  the "other" is the latest round by the opposite participant.
 - Answers encode to a **70-char digit string** (one digit per question). Map:
-  multiplier `{1, .5, 0, -.5, -1}` ⇄ digit `{4,3,2,1,0}` (`round(m*2)+2`).
-  Raw answers (not just scores) are carried so the future annotation layer can
-  re-score per-question. Scores are **recomputed** from answers in `results.html`
-  using `questions.js` — single source of truth, no score drift.
-- URL params on `results.html`: `e,d,g,s` (own axis scores, as before) +
-  `a` (own encoded answers) + `c` (challenger's encoded answers, optional).
+  multiplier `{1, .5, 0, -.5, -1}` ⇄ digit `{4,3,2,1,0}` (`round(m*2)+2`). Raw
+  answers (not just scores) are carried so re-answers re-score cleanly. Scores are
+  **recomputed** from answers using `questions.js` — single source of truth.
+- Thread codec: `encodeThread` = `JSON.stringify`; the URL layer applies
+  `encodeURIComponent` at link-build time and `getParam` strips that one decode
+  pass — so `encodeThread`/`decodeThread` are pure inverses (don't double-encode).
 
 ## Files changed vs upstream
-- `quiz.html` — capture raw answer multipliers; read blind `?c=`; pass
-  `&a=`/`&c=` to results. Removed ad/statcounter.
-- `results.html` — load `questions.js`; decode/recompute challenger; compare card
-  (CSS in `<head>`, markup after `<h1>Results</h1>`, logic in main script);
-  challenge/copy-link button. Removed ad/statcounter.
-- `index.html`, `instructions.html` — removed ad/statcounter only.
+- `compare.js` — **new.** Shared substrate: URL param read, answer codec, scoring
+  (`scoreFromAnswers`), `agreement`, and the thread model
+  (`encodeThread`/`decodeThread`/`participantLatest`/`nextParticipant`/`openFlagsFor`).
+  Included by both quiz and results. Has a CommonJS hook so the math is
+  node-checkable headlessly.
+- `quiz.html` — three modes off `?t=`: solo round 0 (all 70), blind round 1
+  (all 70, hidden), **annotate** (only the other person's flagged questions, note
+  shown, seeded from this taker's prior answers). Appends its round, hands to
+  results. Also a **TEMPORARY** round-0 toggle: full quiz vs a random 5-question
+  sample (default sample, for testing); the chosen set is stored on round 0
+  (`.q`) so every later taker answers the same questions. Removed ad/statcounter.
+- `results.html` — thread-driven: recompute bars/labels/ideology/banner from the
+  viewer's answers; compare card vs the other participant; **flag composer**
+  (question picker + 200-char note), **flag transcript**, and the send-back /
+  challenge link. Dropped the old `a`/`c`/`e,d,g,s` params and the duplicated
+  helpers (now in `compare.js`). Removed ad/statcounter.
+- `index.html` — added an intro card (fork-of-8values, what's different, the
+  4-step flow, privacy) + removed ad/statcounter.
+- `instructions.html` — removed ad/statcounter only.
 
 ## Run locally
 ```
@@ -50,35 +75,43 @@ python3 -m http.server 8418 --directory .
 open http://localhost:8418/
 ```
 
-## Verify (no browser extension needed)
-Math + render logic are covered by node checks run against `questions.js`:
-- encode→decode round-trips exactly; recomputed scores match the quiz formula.
-- agreement = `round(100 - mean(|axis gap|))`; identical answers → 100%.
-- render logic picks the right biggest-gap axis and headline threshold.
-Inline scripts pass `node --check`. (Re-run by porting the snippets in the commit
-message / this session's transcript, or just click through in a browser.)
+## Verify
+Math + thread logic — node checks against `questions.js` + `compare.js`
+(`/tmp/cmp_test.js`, `/tmp/e2e.js` in the build session):
+- answer codec round-trips; identical → 100%; all-neutral → 50/50/50/50;
+  opposite → 92% (8values per-question effects aren't symmetric — expected).
+- E2E multi-turn: round0 P0 → blind round1 P1 → flag → annotate round2 P0
+  re-answers only flagged, unflagged preserved → round3 possible.
+- inline scripts pass `node --check`.
 
-Browser smoke test via Chrome MCP was blocked — extension not connected. Eyeball
-manually instead.
+Browser smoke — **Playwright** (Chrome MCP extension was not connected; Playwright
+MCP needs no extension). Full loop driven headless, zero console errors: solo →
+blind challenge → compare card (87%) → flag composer (select/note/add/pending/
+send-link) → annotate retake (only flagged Q, note shown, seed preserved) →
+compare updates (88%) + transcript. Re-run by serving locally and repeating, or
+port the snippets from the session transcript.
 
 ## Known limits / decisions
 - Agreement metric is mean axis gap (intuitive, not calibrated). Opposite answers
   land ~89–92% because 8values per-question effects aren't symmetric — expected.
-- URL length fine for POC (~150 chars). Messenger truncation (~2k) not a risk yet.
-- Privacy: answers live in the link; anyone with the link sees them. Fine for a
-  dyad, but state it plainly before any public deploy.
-- Compare card uses its own scoped CSS; original 8values bars untouched.
+- URL length: thread is JSON, so it grows with rounds and note text. Fine for a
+  POC; the documented fix is URL→KV (below).
+- Privacy: the whole conversation lives in the link; anyone with the link sees
+  every answer and note. Stated in the index intro. Fine for a dyad.
+- Flagging only appears on the compare view (you must have someone to compare
+  with). A solo results page shows only "Challenge a friend" — by design.
+- Tooling note (build session): the shell had `errexit` that aborted on `grep`
+  no-match, and `Grep`/Chrome-MCP tools were unavailable — used `node` for file
+  scans and Playwright for the browser smoke.
 
 ## Next steps (priority order)
-1. **Annotation layer** — the actual product. Let the challenger flag a question
-   ("ambiguous: 'X' could mean A or B; I answered under B") and have the other
-   re-answer just the flagged ones. Depth 1, max 2 readings/question, ~200-char
-   note cap. Per-question answers are already in the URL to support this.
+1. **Deploy** — GitHub Pages on `debedb/8values` master (chosen).
+   NOTE: `gh` resolves to the **upstream** `8values/8values.github.io` by default;
+   always pass `--repo debedb/8values` for PR/Pages so nothing targets upstream.
 2. **Interpretation ranges** — if a question has two readings, a person's score
    becomes a *region*, not a point. Show overlap of the two regions = "agreement
    under best-faith reading."
-3. **Deploy** — GitHub Pages on the fork (`debedb/8values`, rename or set Pages to
-   `feat/blind-compare`→`master` first) or Vercel static. Both free.
-4. **URL→KV migration** — when annotation notes overflow the URL, swap the
-   encode/decode layer for a short ID backed by free-tier KV (Upstash/Vercel).
-   Encode/decode boundary already isolates this; no rework of the flow.
+3. **URL→KV migration** — when threads/notes overflow the URL, swap the
+   encode/decode layer (`compare.js`) for a short ID backed by free-tier KV
+   (Upstash/Vercel). The encode/decode boundary is already isolated.
+4. **Improve question wording / flag prompts** — refine copy later.

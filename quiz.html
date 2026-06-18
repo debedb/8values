@@ -5,13 +5,50 @@
 <link rel="icon" type="x-icon" href="icon.png">
 <link rel="shortcut icon" type="x-icon" href="icon.png">
 <meta charset="utf-8">
+<style>
+  #mode-toggle {
+    max-width: 700px;
+    margin: 10pt auto;
+    padding: 8pt 12pt;
+    text-align: center;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12pt;
+    background: #fff8e1;
+    border: 1px dashed #e0c060;
+    border-radius: 6pt;
+  }
+  #mode-toggle label { margin: 0 8pt; cursor: pointer; }
+  #mode-toggle .note { font-size: 9pt; color: #999; margin-top: 4pt; }
+  #annotate-banner {
+    max-width: 700px;
+    margin: 12pt auto;
+    padding: 10pt 14pt;
+    border-left: 4px solid #e91e63;
+    background: #fbe9ef;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12pt;
+    color: #333;
+    border-radius: 4pt;
+  }
+  #annotate-note { font-style: italic; color: #555; margin-top: 6pt; }
+</style>
 </head>
 <body>
-<script type="application/javascript"
-        src="questions.js">
-</script>
+<script type="application/javascript" src="questions.js"></script>
+<script type="application/javascript" src="compare.js"></script>
 <h1>8values</h1>
 <hr>
+<!-- TEMPORARY testing toggle: pick full quiz vs a quick 5-question sample.
+     Shown only on a fresh (round 0) take; later takers inherit the set. -->
+<div id="mode-toggle" style="display:none;">
+  <label><input type="radio" name="qmode" value="sample" checked> Quick sample (5 random)</label>
+  <label><input type="radio" name="qmode" value="full"> Full quiz (70)</label>
+  <div class="note">Temporary testing toggle</div>
+</div>
+<div id="annotate-banner" style="display:none;">
+  <b>They read this one differently.</b> Re-answer just the questions they flagged.
+  <div id="annotate-note"></div>
+</div>
 <h2 style="text-align:center;" id="question-number">Loading...</h2>
 <p class="question" id="question-text"></p>
 <button class="button stronglyAgree" onclick="next_question( 1.0)">Strongly Agree</button> <br>
@@ -24,43 +61,91 @@
 
 <!-- JavaScript for the test itself -->
 <script>
-    var max_econ, max_dipl, max_govt, max_scty; // Max possible scores
-    max_econ = max_dipl = max_govt = max_scty = 0;
-    let econ_array = new Array(questions.length);
-    let dipl_array = new Array(questions.length);
-    let govt_array = new Array(questions.length);
-    let scty_array = new Array(questions.length);
-    let answer_array = new Array(questions.length); // Raw multipliers, for share/compare
-    var qn = 0; // Question number
+    // The conversation so far (see compare.js for the thread shape). Empty on a
+    // fresh solo take. Carried hand-to-hand via ?t=.
+    var thread = decodeThread(getParam("t"))
 
-    // A challenger's encoded answers, passed via ?c=. Held but NOT revealed (blind quiz).
-    function getQueryVariable(variable) {
-        var query = window.location.search.substring(1)
-        var vars = query.split("&")
-        for (var i = 0; i < vars.length; i++) {
-            var pair = vars[i].split("=")
-            if (pair[0] == variable) { return decodeURIComponent(pair[1]) }
-        }
-        return ""
-    }
-    var challenge = getQueryVariable("c")
+    // Who is taking the quiz now: the participant who did NOT author the last
+    // round. 0 (initiator) when the thread is empty.
+    var me = nextParticipant(thread)
 
-    // Map an answer multiplier to a single digit and back. {1,.5,0,-.5,-1} -> {4,3,2,1,0}.
-    function encodeAnswers(arr) {
-        let retval = arr.map(function(m) { return String(Math.round(m * 2) + 2) }).join("")
+    // Flags the OTHER person raised that this taker must address. Non-empty only
+    // in annotate mode (round >= 2); blind round 1 sees none.
+    var openFlags = openFlagsFor(thread, me)
+    var annotate = openFlags.length > 0
+    var isRound0 = thread.length === 0
+
+    // ---- Question set ---------------------------------------------------------
+    // TEMPORARY testing aid: a round-0 taker can answer a random 5 instead of all
+    // 70. The chosen set is stored on round 0 of the thread so every later taker
+    // answers the same questions (otherwise the comparison is meaningless).
+    function inheritedSample() {
+        var retval = null
+        if (thread.length > 0 && thread[0].q) { retval = thread[0].q }
         return retval
     }
 
-    init_question();
-    for (var i = 0; i < questions.length; i++) {
-        max_econ += Math.abs(questions[i].effect.econ)
-        max_dipl += Math.abs(questions[i].effect.dipl)
-        max_govt += Math.abs(questions[i].effect.govt)
-        max_scty += Math.abs(questions[i].effect.scty)
+    function randomSample(n) {
+        var idx = []
+        for (var i = 0; i < questions.length; i++) { idx.push(i) }
+        for (var i = idx.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1))
+            var tmp = idx[i]; idx[i] = idx[j]; idx[j] = tmp
+        }
+        var retval = idx.slice(0, n).sort(function (a, b) { return a - b })
+        return retval
     }
+
+    var sampleSet = inheritedSample() // null => full quiz
+    var answer_array, askIndices, qn
+
+    function buildAsk() {
+        if (annotate) {
+            askIndices = []
+            for (var i = 0; i < openFlags.length; i++) { askIndices.push(openFlags[i].q) }
+        } else if (sampleSet) {
+            askIndices = sampleSet.slice()
+        } else {
+            askIndices = []
+            for (var i = 0; i < questions.length; i++) { askIndices.push(i) }
+        }
+        // Seed answers: annotate keeps this taker's previous answers and only
+        // overwrites the flagged ones; otherwise start blank.
+        answer_array = new Array(questions.length)
+        if (annotate) {
+            var prior = participantLatest(thread, me)
+            if (prior) { answer_array = decodeAnswers(prior.a) }
+        }
+        qn = 0
+        init_question()
+    }
+
+    // Round 0 only: show the temporary toggle and honor it live.
+    if (isRound0) {
+        document.getElementById("mode-toggle").style.display = "block"
+        var radios = document.getElementsByName("qmode")
+        for (var i = 0; i < radios.length; i++) {
+            radios[i].onchange = function () {
+                sampleSet = (this.value === "sample") ? randomSample(5) : null
+                buildAsk()
+            }
+        }
+        sampleSet = randomSample(5) // default = sample (radio 'sample' is checked)
+    }
+
+    function currentQ() {
+        var retval = askIndices[qn]
+        return retval
+    }
+
     function init_question() {
-        document.getElementById("question-text").innerHTML = questions[qn].question;
-        document.getElementById("question-number").innerHTML = "Question " + (qn + 1) + " of " + (questions.length);
+        var qi = currentQ()
+        document.getElementById("question-text").innerHTML = questions[qi].question;
+        document.getElementById("question-number").innerHTML = "Question " + (qn + 1) + " of " + (askIndices.length);
+        if (annotate) {
+            document.getElementById("annotate-banner").style.display = "block"
+            document.getElementById("annotate-note").innerHTML = "They said: &ldquo;" + escapeHtml(openFlags[qn].n) + "&rdquo;"
+        }
         if (qn == 0) {
             document.getElementById("back_button").style.display = 'none';
             document.getElementById("back_button_off").style.display = 'block';
@@ -68,20 +153,22 @@
             document.getElementById("back_button").style.display = 'block';
             document.getElementById("back_button_off").style.display = 'none';
         }
+    }
 
+    function escapeHtml(s) {
+        var retval = String(s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+        return retval
     }
 
     function next_question(mult) {
-        answer_array[qn] = mult
-        econ_array[qn] = mult*questions[qn].effect.econ
-        dipl_array[qn] = mult*questions[qn].effect.dipl
-        govt_array[qn] = mult*questions[qn].effect.govt
-        scty_array[qn] = mult*questions[qn].effect.scty
+        answer_array[currentQ()] = mult
         qn++;
-        if (qn < questions.length) {
+        if (qn < askIndices.length) {
             init_question();
         } else {
-            results();
+            finish();
         }
     }
 
@@ -93,25 +180,19 @@
         init_question();
     }
 
-    function calc_score(score,max) {
-        return (100*(max+score)/(2*max)).toFixed(1)
-    }
-
-    function results() {
-        let final_econ = econ_array.reduce((a, b) => a + b, 0)
-        let final_dipl = dipl_array.reduce((a, b) => a + b, 0)
-        let final_govt = govt_array.reduce((a, b) => a + b, 0)
-        let final_scty = scty_array.reduce((a, b) => a + b, 0)
-        let url = `results.html`
-            + `?e=${calc_score(final_econ,max_econ)}`
-            + `&d=${calc_score(final_dipl,max_dipl)}`
-            + `&g=${calc_score(final_govt,max_govt)}`
-            + `&s=${calc_score(final_scty,max_scty)}`
-            + `&a=${encodeAnswers(answer_array)}`
-        if (challenge) {
-            url += `&c=${encodeURIComponent(challenge)}`
+    function finish() {
+        // Any question never reached defaults to neutral.
+        for (var i = 0; i < answer_array.length; i++) {
+            if (answer_array[i] === undefined) { answer_array[i] = 0 }
         }
+        // Append this taker's round to the conversation and hand it to results.
+        var round = { p: me, a: encodeAnswers(answer_array), f: [] }
+        if (isRound0 && sampleSet) { round.q = sampleSet }
+        thread.push(round)
+        var url = "results.html?t=" + encodeURIComponent(encodeThread(thread))
         location.href = url
     }
+
+    buildAsk()
 </script>
 </body>
