@@ -8,16 +8,140 @@
 <script>
   version = "Test Edition #1" //Remember to update this before making changes to the test itself!
 </script>
+<style>
+  #compare-card {
+    max-width: 700px;
+    margin: 16pt auto;
+    padding: 16pt 20pt;
+    border-radius: 10pt;
+    background: #f4f6f8;
+    border: 1px solid #d8dde2;
+    font-family: 'Montserrat', sans-serif;
+    color: #222;
+  }
+  #agree-headline { font-size: 22pt; font-weight: 700; }
+  #agree-sub { font-size: 13pt; color: #555; margin-bottom: 12pt; }
+  .cmp-row { margin: 10pt 0; }
+  .cmp-axis-label { font-size: 11pt; font-weight: 700; display: flex; justify-content: space-between; }
+  .cmp-axis-label .pole { color: #888; font-weight: 400; }
+  .cmp-track {
+    position: relative;
+    height: 16px;
+    margin-top: 4px;
+    border-radius: 8px;
+    background: linear-gradient(to right, #e3e7eb, #e3e7eb);
+  }
+  .cmp-dot {
+    position: absolute;
+    top: -3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    transform: translateX(-11px);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    font-size: 9pt;
+    line-height: 18px;
+    text-align: center;
+    color: #fff;
+    font-weight: 700;
+  }
+  .cmp-you  { background: #2196f3; }
+  .cmp-them { background: #e91e63; }
+  .cmp-row.diverge .cmp-track { box-shadow: 0 0 0 2px #e91e63; }
+  #diverge-hook {
+    margin-top: 14pt;
+    padding: 10pt 12pt;
+    background: #fff;
+    border-left: 4px solid #e91e63;
+    font-size: 12pt;
+  }
+  .cmp-legend { font-size: 10pt; color: #666; margin-bottom: 8pt; }
+  .cmp-legend b.you  { color: #2196f3; }
+  .cmp-legend b.them { color: #e91e63; }
+
+  /* Annotation layer */
+  #flag-section {
+    max-width: 700px;
+    margin: 16pt auto;
+    padding: 16pt 20pt;
+    border-radius: 10pt;
+    background: #fff;
+    border: 1px solid #d8dde2;
+    font-family: 'Montserrat', sans-serif;
+    color: #222;
+  }
+  #flag-section h3 { margin: 0 0 4pt 0; font-size: 15pt; }
+  #flag-section .hint { font-size: 11pt; color: #666; margin-bottom: 10pt; }
+  #flag-thread { margin-bottom: 14pt; }
+  .flag-item {
+    padding: 8pt 10pt;
+    margin: 6pt 0;
+    border-left: 3px solid #bbb;
+    background: #f7f8fa;
+    font-size: 11pt;
+  }
+  .flag-item .who { font-weight: 700; }
+  .flag-item .who.p0 { color: #2196f3; }
+  .flag-item .who.p1 { color: #e91e63; }
+  .flag-item .q { color: #444; }
+  .flag-item .note { font-style: italic; color: #555; }
+  #flag-composer select, #flag-composer textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 11pt;
+    padding: 7pt;
+    margin: 4pt 0;
+    border: 1px solid #bbb;
+    border-radius: 6pt;
+    font-family: 'Montserrat', sans-serif;
+  }
+  #flag-composer textarea { resize: vertical; min-height: 48px; }
+  #flag-pending .pending-item {
+    font-size: 11pt;
+    padding: 6pt 8pt;
+    margin: 4pt 0;
+    background: #fbe9ef;
+    border-left: 3px solid #e91e63;
+    border-radius: 4pt;
+  }
+  #flag-pending .pending-item button {
+    float: right;
+    border: none;
+    background: none;
+    color: #e91e63;
+    cursor: pointer;
+    font-size: 12pt;
+  }
+  #challenge-block { max-width: 700px; margin: 16pt auto; text-align: center; }
+  #challenge-link {
+    width: 90%;
+    max-width: 640px;
+    padding: 8pt;
+    font-size: 11pt;
+    margin-top: 8pt;
+    border: 1px solid #bbb;
+    border-radius: 6pt;
+  }
+</style>
 </head>
-<script type="application/javascript"
-        src="ideologies.js">
-</script>
+<script type="application/javascript" src="ideologies.js"></script>
+<script type="application/javascript" src="questions.js"></script>
+<script type="application/javascript" src="compare.js"></script>
 
 <body>
 <h1>8values</h1>
 <hr>
 
 <h1>Results</h1>
+
+<div id="compare-card" style="display:none;">
+    <div id="agree-headline"></div>
+    <div id="agree-sub"></div>
+    <div class="cmp-legend"><b class="you">&#9679; You</b> &nbsp; vs &nbsp; <b class="them">&#9679; Them</b></div>
+    <div id="compare-tracks"></div>
+    <div id="diverge-hook"></div>
+</div>
 
 <h2>Economic Axis: <span class="weight-300" id="economic-label"></span></h2>
 <div class="axis">
@@ -49,41 +173,49 @@
 </div>
 <h2>Closest Match: <span class="weight-300" id="ideology-label"></span></h2>
 <p>Ideological matching is a work in progress, and is much less accurate than the values and axes.</p>
-<p>You can send these results by copying and pasting the URL at the top of the page or using the image below. Think your matched ideology was wrong? Want to help us calibrate the test? Send the results along with your political ideology to us at eightvalues@gmail.com, or send us any comments, questions, or criticism. </p>
+
+<div id="flag-section" style="display:none;">
+    <h3>Read it differently?</h3>
+    <p class="hint">Flag a question you think you each read in different ways. Add a short note on how
+    you read it, then send the link back &mdash; they re-answer just the flagged ones.</p>
+    <div id="flag-thread"></div>
+    <div id="flag-composer">
+        <select id="flag-q"></select>
+        <textarea id="flag-note" maxlength="200" placeholder="How did you read this one? (e.g. &ldquo;'freedom' here = economic, not personal&rdquo;)"></textarea>
+        <button class="small_button" id="flag-add">Add flag</button>
+        <div id="flag-pending"></div>
+    </div>
+</div>
+
+<div id="challenge-block" style="display:none;">
+    <button class="button" id="challenge-btn">Challenge a friend &mdash; copy link</button>
+    <p id="challenge-help" style="font-size:11pt;color:#555;">They take the quiz blind, then see how your answers compare.</p>
+    <input id="challenge-link" readonly style="display:none;">
+</div>
+
 <hr/>
 <img src="" id="banner">
 <button class="button" onclick="location.href='index.html';">Back</button> <br>
-<!-- Website visit statistics - no personal information is collected! -->
-<script type="text/javascript">
-var sc_project=11325211;
-var sc_invisible=1;
-var sc_security="fd9f0659";
-var scJsHost = (("https:" == document.location.protocol) ?
-"https://secure." : "http://www.");
-document.write("<sc"+"ript type='text/javascript' src='" +
-scJsHost+
-"statcounter.com/counter/counter.js'></"+"script>");
-</script>
-<noscript><div class="statcounter"><a title="web stats"
-href="http://statcounter.com/" target="_blank"><img
-class="statcounter"
-src="//c.statcounter.com/11325211/0/fd9f0659/1/" alt="web
-stats"></a></div></noscript>
 <script>
-    function getQueryVariable(variable)
-    {
-           var query = window.location.search.substring(1)
-           var vars = query.split("&")
-           for (var i=0;i<vars.length;i++) {
-                   var pair = vars[i].split("=")
-                   if(pair[0] == variable) {return pair[1]}
-           }
-           return(NaN);
+    // ---- Load the conversation ------------------------------------------------
+    // Everything rides in ?t= (see compare.js). No thread -> nothing to show.
+    var thread = decodeThread(getParam("t"))
+    if (!thread || thread.length === 0) {
+        location.href = "index.html"
     }
 
+    // The viewer is whoever authored the most recent round (they just finished).
+    var viewerP = thread[thread.length - 1].p
+    var otherP = viewerP === 0 ? 1 : 0
+    var viewerRound = participantLatest(thread, viewerP)
+    var otherRound = participantLatest(thread, otherP)
+
+    var youScores = scoreFromAnswers(decodeAnswers(viewerRound.a))
+
+    // ---- Axis bars / labels / ideology (own scores) ---------------------------
     function setBarValue(name, value) {
-        innerel = document.getElementById(name)
-        outerel = document.getElementById("bar-" + name)
+        var innerel = document.getElementById(name)
+        var outerel = document.getElementById("bar-" + name)
         outerel.style.width = (value + "%")
         innerel.innerHTML = (value + "%")
         if (innerel.offsetWidth + 20 > outerel.offsetWidth) {
@@ -91,31 +223,33 @@ stats"></a></div></noscript>
         }
     }
 
-    econArray = ["Communist","Socialist","Social","Centrist","Market","Capitalist","Laissez-Faire"]
-    diplArray = ["Cosmopolitan","Internationalist","Peaceful","Balanced","Patriotic","Nationalist","Chauvinist"]
-    govtArray = ["Anarchist","Libertarian","Liberal","Moderate","Statist","Authoritarian","Totalitarian"]
-    sctyArray = ["Revolutionary","Very Progressive","Progressive","Neutral","Traditional","Very Traditional","Reactionary"]
+    var econArray = ["Communist","Socialist","Social","Centrist","Market","Capitalist","Laissez-Faire"]
+    var diplArray = ["Cosmopolitan","Internationalist","Peaceful","Balanced","Patriotic","Nationalist","Chauvinist"]
+    var govtArray = ["Anarchist","Libertarian","Liberal","Moderate","Statist","Authoritarian","Totalitarian"]
+    var sctyArray = ["Revolutionary","Very Progressive","Progressive","Neutral","Traditional","Very Traditional","Reactionary"]
 
     function setLabel(val,ary) {
-        if (val > 100) { return "" } else
-        if (val > 90) { return ary[0] } else
-        if (val > 75) { return ary[1] } else
-        if (val > 60) { return ary[2] } else
-        if (val >= 40) { return ary[3] } else
-        if (val >= 25) { return ary[4] } else
-        if (val >= 10) { return ary[5] } else
-        if (val >= 0) { return ary[6] } else
-        	{return ""}
+        var retval = ""
+        if (val > 100) { retval = "" } else
+        if (val > 90) { retval = ary[0] } else
+        if (val > 75) { retval = ary[1] } else
+        if (val > 60) { retval = ary[2] } else
+        if (val >= 40) { retval = ary[3] } else
+        if (val >= 25) { retval = ary[4] } else
+        if (val >= 10) { retval = ary[5] } else
+        if (val >= 0) { retval = ary[6] }
+        return retval
     }
 
-    equality  = getQueryVariable("e")
-    peace     = getQueryVariable("d")
-    liberty   = getQueryVariable("g")
-    progress  = getQueryVariable("s")
-    wealth    = (100 - equality).toFixed(1)
-    might     = (100 - peace   ).toFixed(1)
-    authority = (100 - liberty ).toFixed(1)
-    tradition = (100 - progress).toFixed(1)
+    // High-pole percentages (same orientation as upstream).
+    var equality  = youScores.econ
+    var peace     = youScores.dipl
+    var liberty   = youScores.civil
+    var progress  = youScores.scty
+    var wealth    = (100 - equality).toFixed(1)
+    var might     = (100 - peace   ).toFixed(1)
+    var authority = (100 - liberty ).toFixed(1)
+    var tradition = (100 - progress).toFixed(1)
 
     setBarValue("equality", equality)
     setBarValue("wealth", wealth)
@@ -131,10 +265,10 @@ stats"></a></div></noscript>
     document.getElementById("state-label").innerHTML = setLabel(liberty, govtArray)
     document.getElementById("society-label").innerHTML = setLabel(progress, sctyArray)
 
-    ideology = ""
-    ideodist = Infinity
+    var ideology = ""
+    var ideodist = Infinity
     for (var i = 0; i < ideologies.length; i++) {
-        dist = 0
+        var dist = 0
         dist += Math.pow(Math.abs(ideologies[i].stats.econ - equality), 2)
         dist += Math.pow(Math.abs(ideologies[i].stats.govt - liberty), 2)
         dist += Math.pow(Math.abs(ideologies[i].stats.dipl - peace), 1.73856063)
@@ -146,14 +280,203 @@ stats"></a></div></noscript>
     }
     document.getElementById("ideology-label").innerHTML = ideology
 
-    function createImage(src, x, y, w, h) {
-        img = new Image ()
-        img.src = src
-        img.onLoad = function() {
-            ctx.drawImage(img, x, y, w, h)
+    // ---- Compare card (you vs them) -------------------------------------------
+    function escapeHtml(s) {
+        var retval = String(s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+        return retval
+    }
+    function truncate(s, n) {
+        var retval = String(s)
+        if (retval.length > n) { retval = retval.substring(0, n - 1) + "…" }
+        return retval
+    }
+    function personLabel(p) {
+        var retval = (p === viewerP) ? "You" : "Them"
+        return retval
+    }
+
+    var axes = [
+        { key: "econ",  name: "Economic",   left: "Markets",   right: "Equality" },
+        { key: "dipl",  name: "Diplomatic", left: "Nation",    right: "Globe" },
+        { key: "civil", name: "Civil",      left: "Authority", right: "Liberty" },
+        { key: "scty",  name: "Societal",   left: "Tradition", right: "Progress" }
+    ]
+
+    if (otherRound) {
+        var them = scoreFromAnswers(decodeAnswers(otherRound.a))
+        var you = youScores
+        var maxGap = -1, maxAxis = axes[0]
+        for (var i = 0; i < axes.length; i++) {
+            var g = Math.abs(you[axes[i].key] - them[axes[i].key])
+            axes[i].gap = g
+            if (g > maxGap) { maxGap = g; maxAxis = axes[i] }
+        }
+        var agree = agreement(you, them)
+
+        var headline, frame
+        if (agree >= 70) {
+            headline = "More alike than you might think."
+            frame = "You land close together across the board."
+        } else if (agree >= 45) {
+            headline = "Plenty of common ground."
+            frame = "Real overlap, with a few axes worth talking through."
+        } else {
+            headline = "Genuine differences here."
+            frame = "Worth comparing how you each read the questions."
+        }
+        document.getElementById("agree-headline").innerHTML = "Agreement: " + agree + "%"
+        document.getElementById("agree-sub").innerHTML = headline + " " + frame
+
+        var tracksHtml = ""
+        for (var i = 0; i < axes.length; i++) {
+            var ax = axes[i]
+            var youPct = you[ax.key], themPct = them[ax.key]
+            var diverge = (ax.key === maxAxis.key) ? " diverge" : ""
+            tracksHtml +=
+                '<div class="cmp-row' + diverge + '">' +
+                  '<div class="cmp-axis-label"><span class="pole">' + ax.left + '</span>' +
+                    '<span>' + ax.name + '</span>' +
+                    '<span class="pole">' + ax.right + '</span></div>' +
+                  '<div class="cmp-track">' +
+                    '<div class="cmp-dot cmp-you" style="left:' + youPct + '%">' + Math.round(youPct) + '</div>' +
+                    '<div class="cmp-dot cmp-them" style="left:' + themPct + '%">' + Math.round(themPct) + '</div>' +
+                  '</div>' +
+                '</div>'
+        }
+        document.getElementById("compare-tracks").innerHTML = tracksHtml
+
+        document.getElementById("diverge-hook").innerHTML =
+            "Biggest gap: <b>" + maxAxis.name + "</b> (you " + Math.round(you[maxAxis.key]) +
+            ", them " + Math.round(them[maxAxis.key]) + "). " +
+            "Is that a real disagreement, or did you read those questions differently? " +
+            "That gap is the place to start the conversation."
+
+        document.getElementById("compare-card").style.display = "block"
+    }
+
+    // ---- Annotation: thread transcript + flag composer + send link ------------
+    var comparing = !!otherRound
+
+    // Render every flag raised so far, oldest first.
+    function renderThread() {
+        var html = ""
+        for (var r = 0; r < thread.length; r++) {
+            var f = thread[r].f || []
+            for (var k = 0; k < f.length; k++) {
+                var qi = f[k].q
+                var cls = thread[r].p === 0 ? "p0" : "p1"
+                html +=
+                    '<div class="flag-item">' +
+                      '<span class="who ' + cls + '">' + personLabel(thread[r].p) + '</span> ' +
+                      'flagged <span class="q">&ldquo;' + escapeHtml(truncate(questions[qi].question, 90)) + '&rdquo;</span>' +
+                      '<div class="note">&ldquo;' + escapeHtml(f[k].n) + '&rdquo;</div>' +
+                    '</div>'
+            }
+        }
+        if (!html) { html = '<p class="hint">No flags yet.</p>' }
+        document.getElementById("flag-thread").innerHTML = html
+    }
+
+    // Pending flags this viewer is about to send back.
+    var pendingFlags = []
+    function renderPending() {
+        var html = ""
+        for (var i = 0; i < pendingFlags.length; i++) {
+            html +=
+                '<div class="pending-item">' +
+                  '<button data-i="' + i + '" class="pending-del">&times;</button>' +
+                  '<b>' + escapeHtml(truncate(questions[pendingFlags[i].q].question, 70)) + '</b>' +
+                  '<div>' + escapeHtml(pendingFlags[i].n) + '</div>' +
+                '</div>'
+        }
+        document.getElementById("flag-pending").innerHTML = html
+        var dels = document.getElementsByClassName("pending-del")
+        for (var i = 0; i < dels.length; i++) {
+            dels[i].onclick = function () {
+                pendingFlags.splice(Number(this.getAttribute("data-i")), 1)
+                renderPending()
+                refreshLink()
+            }
         }
     }
 
+    function buildSendUrl() {
+        // Attach this viewer's pending flags to their own latest round, then
+        // hand the whole conversation to the next taker via quiz.html?t=.
+        viewerRound.f = pendingFlags
+        var retval = new URL("quiz.html?t=" + encodeURIComponent(encodeThread(thread)), window.location.href).href
+        return retval
+    }
+
+    var linkInput = document.getElementById("challenge-link")
+    var challengeBtn = document.getElementById("challenge-btn")
+    function refreshLink() {
+        linkInput.value = buildSendUrl()
+    }
+
+    if (comparing) {
+        // Populate the question picker. If the conversation used a sample set
+        // (round 0 carries .q), only those questions are answerable, so only
+        // offer those to flag.
+        var sel = document.getElementById("flag-q")
+        var pickIdx = (thread[0] && thread[0].q) ? thread[0].q : null
+        var optHtml = ""
+        if (pickIdx) {
+            for (var i = 0; i < pickIdx.length; i++) {
+                optHtml += '<option value="' + pickIdx[i] + '">' + escapeHtml(truncate(questions[pickIdx[i]].question, 80)) + '</option>'
+            }
+        } else {
+            for (var i = 0; i < questions.length; i++) {
+                optHtml += '<option value="' + i + '">' + escapeHtml(truncate(questions[i].question, 80)) + '</option>'
+            }
+        }
+        sel.innerHTML = optHtml
+
+        document.getElementById("flag-add").onclick = function () {
+            var q = Number(sel.value)
+            var note = document.getElementById("flag-note").value.trim()
+            if (!note) { return }
+            pendingFlags.push({ q: q, n: note })
+            document.getElementById("flag-note").value = ""
+            renderPending()
+            refreshLink()
+        }
+
+        renderThread()
+        renderPending()
+        document.getElementById("flag-section").style.display = "block"
+
+        challengeBtn.innerHTML = "Send back &mdash; copy link"
+        document.getElementById("challenge-help").innerHTML =
+            "They re-answer just the questions you flagged, then you compare again."
+    } else {
+        // Round 0: nothing to compare yet, just hand off a blind challenge.
+        challengeBtn.innerHTML = "Challenge a friend &mdash; copy link"
+    }
+
+    refreshLink()
+    document.getElementById("challenge-block").style.display = "block"
+    challengeBtn.onclick = function () {
+        refreshLink()
+        linkInput.style.display = "inline-block"
+        linkInput.focus()
+        linkInput.select()
+        var url = linkInput.value
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(function () {
+                challengeBtn.innerHTML = "Link copied!"
+            }, function () {
+                challengeBtn.innerHTML = "Select &amp; copy the link below"
+            })
+        } else {
+            document.execCommand("copy")
+            challengeBtn.innerHTML = "Link copied!"
+        }
+    }
+
+    // ---- Shareable results banner (canvas) ------------------------------------
     window.onload = function() {
         var c = document.createElement("canvas")
         var ctx = c.getContext("2d")
@@ -162,7 +485,7 @@ stats"></a></div></noscript>
         ctx.fillStyle = "#EEEEEE"
         ctx.fillRect(0,0,800,650);
 
-        img = document.getElementById("img-equality")
+        var img = document.getElementById("img-equality")
         ctx.drawImage(img, 20, 170, 100, 100);
         img = document.getElementById("img-wealth")
         ctx.drawImage(img, 680, 170, 100, 100)
@@ -220,7 +543,7 @@ stats"></a></div></noscript>
 
         ctx.font="300 30px Montserrat"
         ctx.fillText("8values.github.io", 780, 60)
-		ctx.fillText(version, 780, 90)
+        ctx.fillText(version, 780, 90)
         ctx.textAlign="center"
         ctx.fillText("Economic Axis: " + document.getElementById("economic-label").innerHTML, 400, 175)
         ctx.fillText("Diplomatic Axis: " + document.getElementById("diplomatic-label").innerHTML, 400, 295)
